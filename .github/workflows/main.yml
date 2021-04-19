@@ -1,0 +1,85 @@
+name: Main
+
+on:
+  push:
+    branches:
+      - helium
+  pull_request:
+    branches:
+      - helium
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git \
+            python3-pip \
+            shellcheck \
+            cppcheck
+      - name: Install 'black'
+        run: python3 -m pip install "black==19.3b0"
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # required for do-lint
+      - name: Run lint
+        run: ./tools/circle-ci/do-lint
+
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: crops/poky:latest
+      options: --user root # Get around GitHub action permission denied
+      env:
+        MACHINE: ${{ matrix.machine }}
+        CACHE_DIR: /__w/openbmc/job/sstate-cache
+        CACHE_URI: https://fb-openbmc-sstate.s3.us-east-2.amazonaws.com
+    defaults:
+      run:
+        working-directory: /__w/openbmc/openbmc
+    strategy:
+      matrix:
+        machine:
+          [
+            angelslanding,
+            cmm,
+            elbert,
+            emeraldpools,
+            clearcreek,
+            cloudripper,
+            fbgp2,
+            fbtp,
+            fbttn,
+            fby2,
+            fby3,
+            fuji,
+            galaxy100,
+            grandcanyon,
+            lightning,
+            minipack,
+            northdome,
+            sonorapass,
+            wedge,
+            wedge100,
+            wedge400,
+            yamp,
+            yosemite,
+          ]
+    steps:
+      - name: Checkout code
+        run: |  # Git is too old inside this docker container for actions/checkout@v2
+          git clone -b helium https://github.com/$GITHUB_REPOSITORY.git .
+          git fetch origin $GITHUB_REF:temporary-ci-branch
+          git checkout $GITHUB_SHA
+      - name: Sync Yocto Repository
+        run: ./sync_yocto.sh  # GitHub Action's upload artifact complains about too many files.
+      - name: Check build required
+        run: ./tools/circle-ci/check-build-required
+      - name: Download sstate cache
+        run: ./tools/circle-ci/download-sstate-cache 2> /dev/null
+      - name: Build
+        run: ./tools/circle-ci/do-build
