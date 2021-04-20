@@ -13,7 +13,7 @@ function rm_sstate_cache {
     rm -f sstate-cache.tar
 }
 trap rm_sstate_cache EXIT
-wget "${CACHE_URI}/sstate-cache.tar"
+wget -nv "${CACHE_URI}/sstate-cache.tar"
 
 # Unpack sstate-cache
 tar -xf sstate-cache.tar -C "${CACHE_DIR}"
