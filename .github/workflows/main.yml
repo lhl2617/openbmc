@@ -86,7 +86,7 @@ jobs:
         run: ./sync_yocto.sh  # GitHub Action's upload artifact complains about too many files.
       - name: Check build required
         run: ./tools/circle-ci/check-build-required
-      - name: Download sstate cache
-        run: ./tools/circle-ci/download-sstate-cache
+      # - name: Download sstate cache
+      #   run: ./tools/circle-ci/download-sstate-cache
       - name: Build
         run: ./tools/circle-ci/do-build
