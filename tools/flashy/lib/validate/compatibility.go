@@ -23,11 +23,11 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"syscall"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/facebook/openbmc/tools/flashy/lib/utils"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 // Deal with images that have changed names, but are otherwise compatible.
@@ -115,7 +115,7 @@ var getNormalizedBuildNameFromVersion = func(ver string) (string, error) {
 var getOpenBMCVersionFromImageFile = func(imageFilePath string) (string, error) {
 	// mmap the first 512kB of the image file
 	imageFileBuf, err := fileutils.MmapFileRange(
-		imageFilePath, 0, 512*1024, syscall.PROT_READ, syscall.MAP_SHARED,
+		imageFilePath, 0, 512*1024, unix.PROT_READ, unix.MAP_SHARED,
 	)
 	if err != nil {
 		return "", errors.Errorf("Unable to read and mmap image file '%v': %v",

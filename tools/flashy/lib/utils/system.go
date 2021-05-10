@@ -31,13 +31,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 	"unsafe"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/pkg/errors"
 	"github.com/vtolstov/go-ioctl"
+	"golang.org/x/sys/unix"
 )
 
 // MemInfo represents memory information in bytes.
@@ -210,14 +210,14 @@ var RunCommand = func(cmdArr []string, timeout time.Duration) (int, error, strin
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			// The program exited with exit code != 0
-			waitStatus := exitErr.Sys().(syscall.WaitStatus)
+			waitStatus := exitErr.Sys().(unix.WaitStatus)
 			exitCode = waitStatus.ExitStatus()
 		} else {
 			log.Printf("Could not get exit code, defaulting to '1'")
 		}
 	} else {
 		// exit code should be 0
-		waitStatus := cmd.ProcessState.Sys().(syscall.WaitStatus)
+		waitStatus := cmd.ProcessState.Sys().(unix.WaitStatus)
 		exitCode = waitStatus.ExitStatus()
 	}
 

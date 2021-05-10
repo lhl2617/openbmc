@@ -27,10 +27,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 // SourceRootDir is the absolute directory of flashy's source code.
@@ -56,10 +56,10 @@ var ReadFile = ioutil.ReadFile
 var WriteFile = ioutil.WriteFile // prefer WriteFileWithTimeout
 var RenameFile = os.Rename
 var CreateFile = os.Create
-var Mmap = syscall.Mmap
-var Munmap = syscall.Munmap
+var Mmap = unix.Mmap
+var Munmap = unix.Munmap
 var Glob = filepath.Glob
-var Pwrite = syscall.Pwrite
+var Pwrite = unix.Pwrite
 
 // GetExecutablePath returns the executable's (flashy's) path.
 func GetExecutablePath() string {
@@ -172,7 +172,7 @@ var IsELFFile = func(filename string) bool {
 	elfMagicNumber := []byte{
 		0x7F, 'E', 'L', 'F',
 	}
-	buf, err := MmapFileRange(filename, 0, 4, syscall.PROT_READ, syscall.MAP_SHARED)
+	buf, err := MmapFileRange(filename, 0, 4, unix.PROT_READ, unix.MAP_SHARED)
 	if err != nil {
 		log.Printf("Is ELF File Check: Unable to read and mmap from file '%v': %v, "+
 			"assuming that it is not an ELF file", filename, err)
@@ -270,7 +270,7 @@ var OpenFileWithLock = func(filename string, flag int, how int) (*os.File, error
 	if err != nil {
 		return f, err
 	}
-	err = syscall.Flock(int(f.Fd()), how)
+	err = unix.Flock(int(f.Fd()), how)
 	if err != nil {
 		// close the file
 		f.Close()
@@ -281,7 +281,7 @@ var OpenFileWithLock = func(filename string, flag int, how int) (*os.File, error
 
 // CloseFileWithUnlock closes unlocks the lock on a file and closes it.
 var CloseFileWithUnlock = func(f *os.File) error {
-	err := syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	err := unix.Flock(int(f.Fd()), unix.LOCK_UN)
 	if err != nil {
 		return err
 	}

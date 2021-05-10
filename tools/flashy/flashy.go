@@ -24,13 +24,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"syscall"
 
 	"github.com/facebook/openbmc/tools/flashy/install"
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/facebook/openbmc/tools/flashy/lib/logger"
 	"github.com/facebook/openbmc/tools/flashy/lib/step"
 	"github.com/facebook/openbmc/tools/flashy/lib/validate/image"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -58,9 +58,9 @@ func failIfFlagEmpty(flagName, value string) {
 // leaving the device in a bricked state.
 func ignoreSignals() {
 	var signalsToIgnore = []os.Signal{
-		syscall.SIGHUP,
-		syscall.SIGINT,
-		syscall.SIGTERM,
+		unix.SIGHUP,
+		unix.SIGINT,
+		unix.SIGTERM,
 	}
 
 	for _, sig := range signalsToIgnore {
