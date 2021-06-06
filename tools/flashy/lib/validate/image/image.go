@@ -21,12 +21,12 @@ package image
 
 import (
 	"log"
-	"syscall"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/facebook/openbmc/tools/flashy/lib/flash/flashutils"
 	"github.com/facebook/openbmc/tools/flashy/lib/validate"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 // validateImageFileSie ensures that the image file size is smaller than the size of the
@@ -66,7 +66,7 @@ var ValidateImageFile = func(imageFilePath string, maybeDeviceID string) error {
 		}
 	}
 	imageData, err := fileutils.MmapFile(imageFilePath,
-		syscall.PROT_READ, syscall.MAP_SHARED)
+		unix.PROT_READ, unix.MAP_SHARED)
 	if err != nil {
 		return errors.Errorf("Unable to read image file '%v': %v",
 			imageFilePath, err)

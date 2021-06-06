@@ -23,20 +23,20 @@ import (
 	"log"
 	"os"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/logger"
 	"github.com/facebook/openbmc/tools/flashy/lib/step"
 	"github.com/facebook/openbmc/tools/flashy/lib/utils"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 func init() {
 	step.RegisterStep(unmountDataPartition)
 }
 
-var mount = syscall.Mount
+var mount = unix.Mount
 
 // unmountDataPartition attempts to unmount /mnt/data, which is the data0 partition.
 // if unmount fails, it falls back to remounting /mnt/data RO.
@@ -106,7 +106,7 @@ var runDataPartitionUnmountProcess = func() error {
 	// equivalent to `mount --bind /mnt /tmp/mnt`, using a syscall as
 	// --bind option to mount may not be available
 	log.Printf("Bind mount /mnt to /tmp/mnt")
-	err = mount("/mnt", "/tmp/mnt", "", syscall.MS_BIND, "")
+	err = mount("/mnt", "/tmp/mnt", "", unix.MS_BIND, "")
 	if err != nil {
 		return errors.Errorf("Bind mount /mnt to /tmp/mnt failed: %v", err)
 	}

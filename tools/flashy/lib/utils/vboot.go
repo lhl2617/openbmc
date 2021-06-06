@@ -23,10 +23,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"log"
-	"syscall"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 // AST_SRAM_VBS_BASE is the location in SRAM used for verified boot content/flags.
@@ -141,7 +141,7 @@ var GetVbs = func() (Vbs, error) {
 	length := fileutils.Pagesize // surely larger than AST_SRAM_VBS_SIZE
 
 	pageData, err := fileutils.MmapFileRange("/dev/mem", int64(mmapOffset),
-		length, syscall.PROT_READ, syscall.MAP_SHARED)
+		length, unix.PROT_READ, unix.MAP_SHARED)
 	if err != nil {
 		return vbs, errors.Errorf("Unable to mmap /dev/mem: %v", err)
 	}

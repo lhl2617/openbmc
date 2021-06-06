@@ -40,7 +40,6 @@ import (
 	"log"
 	"os"
 	"regexp"
-	"syscall"
 	"unsafe"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
@@ -48,6 +47,7 @@ import (
 	"github.com/facebook/openbmc/tools/flashy/lib/utils"
 	"github.com/pkg/errors"
 	"github.com/vtolstov/go-ioctl"
+	"golang.org/x/sys/unix"
 )
 
 // flashDeviceFile is an interface for the used flash device file functions, this is implemented by
@@ -129,7 +129,7 @@ var FlashCp = func(imageFilePath, deviceFilePath string, roOffset uint32) error 
 
 	// read image data
 	imageData, err := fileutils.MmapFile(
-		imageFilePath, syscall.PROT_READ, syscall.MAP_SHARED,
+		imageFilePath, unix.PROT_READ, unix.MAP_SHARED,
 	)
 	if err != nil {
 		return errors.Errorf("Can't mmap image file '%v': %v",
@@ -148,7 +148,7 @@ var FlashCp = func(imageFilePath, deviceFilePath string, roOffset uint32) error 
 // openFlashDeviceFile is a wrapper around OpenFileWithLock intended to return
 // an os.File which implements flashDeviceFile.
 var openFlashDeviceFile = func(deviceFilePath string) (flashDeviceFile, error) {
-	return fileutils.OpenFileWithLock(deviceFilePath, os.O_SYNC|os.O_RDWR, syscall.LOCK_EX)
+	return fileutils.OpenFileWithLock(deviceFilePath, os.O_SYNC|os.O_RDWR, unix.LOCK_EX)
 }
 
 var closeFlashDeviceFile = func(f flashDeviceFile) error {
@@ -341,7 +341,7 @@ var verifyFlash = func(
 	}
 
 	flashData, err := fileutils.MmapFileRange(
-		mtdBlockFilePath, 0, int(imageSize), syscall.PROT_READ, syscall.MAP_SHARED,
+		mtdBlockFilePath, 0, int(imageSize), unix.PROT_READ, unix.MAP_SHARED,
 	)
 	if err != nil {
 		return errors.Errorf("Unable to mmap flash device '%v': %v",
