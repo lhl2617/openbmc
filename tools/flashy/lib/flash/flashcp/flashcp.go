@@ -40,15 +40,17 @@ import (
 	"log"
 	"os"
 	"regexp"
-	"unsafe"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/facebook/openbmc/tools/flashy/lib/flash/flashutils/devices"
 	"github.com/facebook/openbmc/tools/flashy/lib/utils"
+	mtdabi "github.com/lhl2617/go-mtd-abi"
 	"github.com/pkg/errors"
-	"github.com/vtolstov/go-ioctl"
 	"golang.org/x/sys/unix"
 )
+
+var MemErase = mtdabi.MemErase
+var MemGetInfo = mtdabi.MemGetInfo
 
 // flashDeviceFile is an interface for the used flash device file functions, this is implemented by
 // os.File and is intended to make testing easier.
@@ -63,32 +65,6 @@ type imageFile struct {
 	name string
 	data []byte
 }
-
-// linux/include/uapi/mtd/mtd-abi.h
-type erase_info_user struct {
-	start  uint32
-	length uint32
-}
-
-// linux/include/uapi/mtd/mtd-abi.h
-type mtd_info_user struct {
-	_type     uint8
-	flags     uint32
-	size      uint32 /* Total size of the MTD */
-	erasesize uint32
-	writesize uint32
-	oobsize   uint32 /* Amount of OOB data per block (e.g. 16) */
-	padding   uint64 /* Old obsolete field; do not use */
-}
-
-const sizeof_mtd_info_user = 32
-const sizeof_erase_user_info = 8
-
-// linux/include/uapi/mtd/mtd-abi.h
-var MEMGETINFO = ioctl.IOR('M', 1, sizeof_mtd_info_user)
-var MEMERASE = ioctl.IOW('M', 2, sizeof_erase_user_info)
-
-var IOCTL = ioctl.IOCTL
 
 // FlashCp copies an image file into a device file.
 // roOffset is the beginning RO region in the MTD. roOffset bytes will be skipped
@@ -108,10 +84,10 @@ var FlashCp = func(imageFilePath, deviceFilePath string, roOffset uint32) error 
 		return errors.Errorf("Unable to open flash device file '%v': %v",
 			deviceFilePath, err)
 	}
-	// get mtd_info_user
-	m, err := getMtdInfoUser(deviceFile.Fd())
+	// get MTD info
+	m, err := getMtdInfo(deviceFile.Fd())
 	if err != nil {
-		return errors.Errorf("Can't get mtd_info_user for '%v', "+
+		return errors.Errorf("Can't get MTD info for '%v', "+
 			"this may not be a MTD flash device: %v",
 			deviceFilePath, err)
 	}
@@ -159,7 +135,7 @@ var closeFlashDeviceFile = func(f flashDeviceFile) error {
 // 1) erase, 2) copy, and 3) verify.
 var runFlashProcess = func(
 	deviceFilePath string,
-	m mtd_info_user,
+	m unix.MtdInfo,
 	imFile imageFile,
 	roOffset uint32) error {
 
@@ -202,14 +178,14 @@ var runFlashProcess = func(
 	return nil
 }
 
-var getMtdInfoUser = func(fd uintptr) (mtd_info_user, error) {
-	var m mtd_info_user
+var getMtdInfo = func(fd uintptr) (unix.MtdInfo, error) {
+	var m unix.MtdInfo
 
-	err := IOCTL(fd, MEMGETINFO, uintptr(unsafe.Pointer(&m)))
+	err := MemGetInfo(fd, &m)
 	if err != nil {
-		return m, errors.Errorf("Can't get mtd_info_user: %v", err)
+		return m, errors.Errorf("Can't get MTD info: %v", err)
 	}
-	log.Printf("Got mtd_info_user: %#v", m)
+	log.Printf("Got MTD info: %#v", m)
 
 	return m, nil
 }
@@ -218,7 +194,7 @@ var getMtdInfoUser = func(fd uintptr) (mtd_info_user, error) {
 // and the imageData is smaller than the device size and roOffset.
 var healthCheck = func(
 	deviceFile flashDeviceFile,
-	m mtd_info_user,
+	m unix.MtdInfo,
 	imFile imageFile,
 	roOffset uint32) error {
 	const mtdFilePathRegEx = "^/dev/mtd[0-9]+$"
@@ -229,9 +205,9 @@ var healthCheck = func(
 			deviceFile.Name(), mtdFilePathRegEx)
 	}
 
-	if uint32(len(imFile.data)) > m.size {
+	if uint32(len(imFile.data)) > m.Size {
 		return errors.Errorf("Image size (%vB) larger than flash device size (%vB)",
-			len(imFile.data), m.size)
+			len(imFile.data), m.Size)
 	}
 
 	if uint32(len(imFile.data)) < roOffset {
@@ -249,40 +225,39 @@ var healthCheck = func(
 // of the block as this is bad MTD practice.
 var eraseFlashDevice = func(
 	deviceFile flashDeviceFile,
-	m mtd_info_user,
+	m unix.MtdInfo,
 	imFile imageFile,
 	roOffset uint32,
 ) error {
 	log.Printf("Erasing flash device '%v'...", deviceFile.Name())
 
-	if m.erasesize == 0 {
+	if m.Erasesize == 0 {
 		// make sure first m.erasesize != 0
 		return errors.Errorf("invalid mtd device erasesize: 0")
 	}
 
 	// make sure we erase from a complete erasesize block
-	eraseStart := uint32(roOffset/m.erasesize) * m.erasesize
+	eraseStart := uint32(roOffset/m.Erasesize) * m.Erasesize
 
 	// make sure we erase up to a complete erasesize block
 	imageSize := uint32(len(imFile.data))
 
 	// check for overflow
-	imageAndEraseSize, err := utils.AddU32(imageSize, m.erasesize)
+	imageAndEraseSize, err := utils.AddU32(imageSize, m.Erasesize)
 	if err != nil {
 		return errors.Errorf("Failed to get erase length: %v", err)
 	}
 	// length if erasesize is 0 (won't over/under-flow here due to m.erasesize > 0)
-	imageErasesizeLength := uint32((imageAndEraseSize-1)/m.erasesize) * m.erasesize
+	imageErasesizeLength := uint32((imageAndEraseSize-1)/m.Erasesize) * m.Erasesize
 	eraseLength := imageErasesizeLength - eraseStart
 
 	log.Printf("Erasing flash device: start: %v, length: %v (end: %v)",
 		eraseStart, eraseLength, eraseStart+eraseLength)
-	e := erase_info_user{
-		start:  eraseStart,
-		length: eraseLength,
+	e := unix.EraseInfo{
+		Start:  eraseStart,
+		Length: eraseLength,
 	}
-
-	err = IOCTL(deviceFile.Fd(), MEMERASE, uintptr(unsafe.Pointer(&e)))
+	err = MemErase(deviceFile.Fd(), &e)
 	if err != nil {
 		errMsg := fmt.Sprintf("Flash device '%v' erase failed: %v",
 			deviceFile.Name(), err)
@@ -297,7 +272,7 @@ var eraseFlashDevice = func(
 // flashImage copies the image file into the device.
 var flashImage = func(
 	deviceFile flashDeviceFile,
-	m mtd_info_user,
+	m unix.MtdInfo,
 	imFile imageFile,
 	roOffset uint32,
 ) error {
@@ -325,7 +300,7 @@ var flashImage = func(
 // verifyFlash compares the image file with the device data block by block.
 var verifyFlash = func(
 	deviceFilePath string,
-	m mtd_info_user,
+	m unix.MtdInfo,
 	imFile imageFile,
 	roOffset uint32,
 ) error {
