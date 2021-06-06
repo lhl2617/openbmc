@@ -37,7 +37,6 @@ import (
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/pkg/errors"
-	"github.com/vtolstov/go-ioctl"
 	"golang.org/x/sys/unix"
 )
 
@@ -447,6 +446,16 @@ var IsDataPartitionMounted = func() (bool, error) {
 	return len(regExMap) != 0, nil
 }
 
+// ioctl performs an ioctl operation specified by req and sets & gets the value
+// on the device pointed by fd.
+var ioctl = func(fd, req, value uintptr) error {
+	_, _, err := unix.Syscall(unix.SYS_IOCTL, fd, req, value)
+	if err != 0 {
+		return err
+	}
+	return nil
+}
+
 func tryPetWatchdog() bool {
 	f, err := os.OpenFile("/dev/watchdog", os.O_RDWR, 0)
 	if err != nil {
@@ -458,12 +467,12 @@ func tryPetWatchdog() bool {
 	// restore the original timeout value because the current design for
 	// flashy is that the system will reboot afterwards.
 	timo := int32(300)
-	err2 := ioctl.IOCTL(f.Fd(), unix.WDIOC_SETTIMEOUT, uintptr(unsafe.Pointer(&timo)))
+	err2 := ioctl(f.Fd(), unix.WDIOC_SETTIMEOUT, uintptr(unsafe.Pointer(&timo)))
 	if err2 != nil {
 		log.Printf("ioctl WDIOC_SETTIMEOUT failed: %v", err2)
 	}
 
-	err3 := ioctl.IOCTL(f.Fd(), unix.WDIOC_KEEPALIVE, uintptr(0))
+	err3 := ioctl(f.Fd(), unix.WDIOC_KEEPALIVE, uintptr(0))
 	if err3 != nil {
 		log.Printf("ioctl WDIOC_KEEPALIVE failed: %v", err3)
 	}

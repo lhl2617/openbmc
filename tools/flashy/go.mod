@@ -8,6 +8,5 @@ require (
 	github.com/lhl2617/go-mtd-abi v0.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/u-root/u-root v7.0.0+incompatible
-	github.com/vtolstov/go-ioctl v0.0.0-20151206205506-6be9cced4810
 	golang.org/x/sys v0.0.0-20210603125802-9665404d3644
 )
