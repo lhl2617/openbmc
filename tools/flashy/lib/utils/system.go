@@ -31,7 +31,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -211,14 +210,14 @@ var RunCommand = func(cmdArr []string, timeout time.Duration) (int, error, strin
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			// The program exited with exit code != 0
-			waitStatus := exitErr.Sys().(syscall.WaitStatus)
+			waitStatus := exitErr.Sys().(unix.WaitStatus)
 			exitCode = waitStatus.ExitStatus()
 		} else {
 			log.Printf("Could not get exit code, defaulting to '1'")
 		}
 	} else {
 		// exit code should be 0
-		waitStatus := cmd.ProcessState.Sys().(syscall.WaitStatus)
+		waitStatus := cmd.ProcessState.Sys().(unix.WaitStatus)
 		exitCode = waitStatus.ExitStatus()
 	}
 
