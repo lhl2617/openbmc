@@ -22,12 +22,12 @@ package devices
 import (
 	"fmt"
 	"path/filepath"
-	"syscall"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/facebook/openbmc/tools/flashy/lib/utils"
 	"github.com/facebook/openbmc/tools/flashy/lib/validate"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 func init() {
@@ -87,7 +87,7 @@ func (m *MemoryTechnologyDevice) MmapRO() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return fileutils.MmapFileRange(mmapFilePath, 0, int(m.FileSize), syscall.PROT_READ, syscall.MAP_SHARED)
+	return fileutils.MmapFileRange(mmapFilePath, 0, int(m.FileSize), unix.PROT_READ, unix.MAP_SHARED)
 }
 
 func (m *MemoryTechnologyDevice) Munmap(buf []byte) error {

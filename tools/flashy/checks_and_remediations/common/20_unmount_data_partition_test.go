@@ -21,7 +21,6 @@ package common
 import (
 	"reflect"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -30,6 +29,7 @@ import (
 	"github.com/facebook/openbmc/tools/flashy/lib/utils"
 	"github.com/facebook/openbmc/tools/flashy/tests"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 func TestUnmountDataPartition(t *testing.T) {
@@ -276,8 +276,8 @@ func TestRunDataPartitionUnmountProcess(t *testing.T) {
 				if target != "/tmp/mnt" {
 					t.Errorf("source: want '%v' got '%v'", "/tmp/mnt", target)
 				}
-				if flags != syscall.MS_BIND {
-					t.Errorf("flags: want '%v' got '%v'", syscall.MS_BIND, flags)
+				if flags != unix.MS_BIND {
+					t.Errorf("flags: want '%v' got '%v'", unix.MS_BIND, flags)
 				}
 				return tc.mountErr
 			}

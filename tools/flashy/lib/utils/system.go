@@ -38,6 +38,7 @@ import (
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/pkg/errors"
 	"github.com/vtolstov/go-ioctl"
+	"golang.org/x/sys/unix"
 )
 
 // MemInfo represents memory information in bytes.
@@ -447,9 +448,6 @@ var IsDataPartitionMounted = func() (bool, error) {
 }
 
 func tryPetWatchdog() bool {
-	var WDIOC_KEEPALIVE = ioctl.IOR('W', 5, 4)
-	var WDIOC_SETTIMEOUT = ioctl.IOWR('W', 6, 4)
-
 	f, err := os.OpenFile("/dev/watchdog", os.O_RDWR, 0)
 	if err != nil {
 		return false
@@ -460,12 +458,12 @@ func tryPetWatchdog() bool {
 	// restore the original timeout value because the current design for
 	// flashy is that the system will reboot afterwards.
 	timo := int32(300)
-	err2 := ioctl.IOCTL(f.Fd(), WDIOC_SETTIMEOUT, uintptr(unsafe.Pointer(&timo)))
+	err2 := ioctl.IOCTL(f.Fd(), unix.WDIOC_SETTIMEOUT, uintptr(unsafe.Pointer(&timo)))
 	if err2 != nil {
 		log.Printf("ioctl WDIOC_SETTIMEOUT failed: %v", err2)
 	}
 
-	err3 := ioctl.IOCTL(f.Fd(), WDIOC_KEEPALIVE, uintptr(0))
+	err3 := ioctl.IOCTL(f.Fd(), unix.WDIOC_KEEPALIVE, uintptr(0))
 	if err3 != nil {
 		log.Printf("ioctl WDIOC_KEEPALIVE failed: %v", err3)
 	}
