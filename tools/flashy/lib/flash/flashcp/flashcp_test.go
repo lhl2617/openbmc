@@ -23,12 +23,12 @@ import (
 	"bytes"
 	"math"
 	"testing"
-	"unsafe"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/facebook/openbmc/tools/flashy/lib/utils"
 	"github.com/facebook/openbmc/tools/flashy/tests"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 type mockFlashDeviceFile struct {
@@ -53,7 +53,7 @@ func TestFlashCp(t *testing.T) {
 	// mock and defer restore openFlashDeviceFile, getMtdInfoUser, MmapFile, Munmap,
 	// runFlashProcess & closeFlashDeviceFile
 	openFileOrig := openFlashDeviceFile
-	getMtdInfoUserOrig := getMtdInfoUser
+	getMtdInfoOrig := getMtdInfo
 	mmapFileOrig := fileutils.MmapFile
 	munmapOrig := fileutils.Munmap
 	runFlashProcessOrig := runFlashProcess
@@ -61,7 +61,7 @@ func TestFlashCp(t *testing.T) {
 	PetWatchdogOrig := utils.PetWatchdog
 	defer func() {
 		openFlashDeviceFile = openFileOrig
-		getMtdInfoUser = getMtdInfoUserOrig
+		getMtdInfo = getMtdInfoOrig
 		fileutils.MmapFile = mmapFileOrig
 		fileutils.Munmap = munmapOrig
 		runFlashProcess = runFlashProcessOrig
@@ -119,7 +119,7 @@ func TestFlashCp(t *testing.T) {
 			getMtdInfoError:    errors.Errorf("get mtd info failed"),
 			mmapFileErr:        nil,
 			runFlashProcessErr: nil,
-			want: errors.Errorf("Can't get mtd_info_user for '/dev/mtd42', " +
+			want: errors.Errorf("Can't get MTD info for '/dev/mtd42', " +
 				"this may not be a MTD flash device: get mtd info failed"),
 		},
 		{
@@ -157,7 +157,7 @@ func TestFlashCp(t *testing.T) {
 
 	exampleDeviceFilePath := "/dev/mtd42"
 	exampleImageFilePath := "/opt/upgrade/image"
-	mtdinfouser := mtd_info_user{erasesize: 4}
+	mtdInfo := unix.MtdInfo{Erasesize: 4}
 	exampleMockFile := &mockFlashDeviceFile{
 		deviceFilePath: exampleDeviceFilePath,
 	}
@@ -182,11 +182,11 @@ func TestFlashCp(t *testing.T) {
 				f.Close()
 				return tc.closeFileErr
 			}
-			getMtdInfoUser = func(fd uintptr) (mtd_info_user, error) {
+			getMtdInfo = func(fd uintptr) (unix.MtdInfo, error) {
 				if fd != 42 {
 					t.Errorf("fd: want '%v' got '%v'", 42, fd)
 				}
-				return mtdinfouser, tc.getMtdInfoError
+				return mtdInfo, tc.getMtdInfoError
 			}
 			fileutils.MmapFile = func(filename string, prot, flags int) ([]byte, error) {
 				if filename != exampleImageFilePath {
@@ -197,7 +197,7 @@ func TestFlashCp(t *testing.T) {
 			}
 			runFlashProcess = func(
 				deviceFilePath string,
-				m mtd_info_user,
+				m unix.MtdInfo,
 				imFile imageFile,
 				roOffset uint32) error {
 				// make sure flashDeviceFile is closed
@@ -292,7 +292,7 @@ func TestRunFlashProcess(t *testing.T) {
 		exampleImageFilePath,
 		exampleImageData,
 	}
-	mtdinfouser := mtd_info_user{}
+	mtdinfouser := unix.MtdInfo{}
 	exampleMockFile := &mockFlashDeviceFile{
 		deviceFilePath: exampleDeviceFilePath,
 	}
@@ -312,16 +312,16 @@ func TestRunFlashProcess(t *testing.T) {
 				f.Close()
 				return tc.cErr
 			}
-			healthCheck = func(deviceFile flashDeviceFile, m mtd_info_user, imFile imageFile, roOffset uint32) error {
+			healthCheck = func(deviceFile flashDeviceFile, m unix.MtdInfo, imFile imageFile, roOffset uint32) error {
 				return tc.hErr
 			}
-			eraseFlashDevice = func(deviceFile flashDeviceFile, m mtd_info_user, imFile imageFile, roOffset uint32) error {
+			eraseFlashDevice = func(deviceFile flashDeviceFile, m unix.MtdInfo, imFile imageFile, roOffset uint32) error {
 				return tc.eErr
 			}
-			flashImage = func(deviceFile flashDeviceFile, m mtd_info_user, imFile imageFile, roOffset uint32) error {
+			flashImage = func(deviceFile flashDeviceFile, m unix.MtdInfo, imFile imageFile, roOffset uint32) error {
 				return tc.fErr
 			}
-			verifyFlash = func(deviceFilePath string, m mtd_info_user, imFile imageFile, roOffset uint32) error {
+			verifyFlash = func(deviceFilePath string, m unix.MtdInfo, imFile imageFile, roOffset uint32) error {
 				if !exampleMockFile.closed {
 					t.Errorf("flash device file must be closed before calling verifyFlash!")
 				}
@@ -333,10 +333,10 @@ func TestRunFlashProcess(t *testing.T) {
 	}
 }
 
-func TestGetMtdInfoUser(t *testing.T) {
-	IOCTLOrig := IOCTL
+func TestGetMtdInfo(t *testing.T) {
+	MemGetInfoOrig := MemGetInfo
 	defer func() {
-		IOCTL = IOCTLOrig
+		MemGetInfo = MemGetInfoOrig
 	}()
 
 	cases := []struct {
@@ -352,23 +352,19 @@ func TestGetMtdInfoUser(t *testing.T) {
 		{
 			name:     "failed",
 			ioctlErr: errors.Errorf("ioctl failed"),
-			wantErr: errors.Errorf("Can't get mtd_info_user: %v",
-				"ioctl failed"),
+			wantErr:  errors.Errorf("Can't get MTD info: ioctl failed"),
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			IOCTL = func(fd, name, data uintptr) error {
+			MemGetInfo = func(fd uintptr, value *unix.MtdInfo) error {
 				if fd != 42 {
 					t.Errorf("fd: want '42' got '%v'", fd)
 				}
-				if name != MEMGETINFO {
-					t.Errorf("name: want '%v' got '%v'", MEMGETINFO, name)
-				}
 				return tc.ioctlErr
 			}
-			_, err := getMtdInfoUser(42)
+			_, err := getMtdInfo(42)
 			tests.CompareTestErrors(tc.wantErr, err, t)
 		})
 	}
@@ -430,8 +426,8 @@ func TestHealthCheck(t *testing.T) {
 			deviceFile := &mockFlashDeviceFile{
 				deviceFilePath: tc.deviceFilePath,
 			}
-			m := mtd_info_user{
-				size: tc.deviceFileSize,
+			m := unix.MtdInfo{
+				Size: tc.deviceFileSize,
 			}
 			err := healthCheck(deviceFile, m, imFile, tc.roOffset)
 			tests.CompareTestErrors(tc.want, err, t)
@@ -440,9 +436,9 @@ func TestHealthCheck(t *testing.T) {
 }
 
 func TestEraseFlashDevice(t *testing.T) {
-	IOCTLOrig := IOCTL
+	MemEraseOrig := MemErase
 	defer func() {
-		IOCTL = IOCTLOrig
+		MemErase = MemEraseOrig
 	}()
 
 	imData := []byte("foobar")
@@ -532,24 +528,21 @@ func TestEraseFlashDevice(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := mtd_info_user{
-				erasesize: tc.mtdErasesize,
+			m := unix.MtdInfo{
+				Erasesize: tc.mtdErasesize,
 			}
-			IOCTL = func(fd, name, data uintptr) error {
+			MemErase = func(fd uintptr, value *unix.EraseInfo) error {
 				if fd != 42 {
 					t.Errorf("fd: want '42' got '%v'", fd)
 				}
-				if name != MEMERASE {
-					t.Errorf("name: want '%v' got '%v'", MEMERASE, name)
-				}
-				gotM := (*erase_info_user)(unsafe.Pointer(data))
-				if gotM.length != tc.wantEraseLen {
+				gotM := *value
+				if gotM.Length != tc.wantEraseLen {
 					t.Errorf("erase length: want '%v' got '%v'",
-						tc.wantEraseLen, gotM.length)
+						tc.wantEraseLen, gotM.Length)
 				}
-				if gotM.start != tc.wantEraseStart {
+				if gotM.Start != tc.wantEraseStart {
 					t.Errorf("erase start: want '%v' got '%v'",
-						tc.wantEraseStart, gotM.start)
+						tc.wantEraseStart, gotM.Start)
 				}
 				return tc.ioctlErr
 			}
@@ -570,8 +563,8 @@ func TestFlashImage(t *testing.T) {
 		name: "/opt/upgrade/image",
 		data: imData,
 	}
-	m := mtd_info_user{
-		erasesize: 4,
+	m := unix.MtdInfo{
+		Erasesize: 4,
 	}
 	cases := []struct {
 		name     string
@@ -650,8 +643,8 @@ func TestVerifyFlash(t *testing.T) {
 		name: "/opt/upgrade/image",
 		data: imData,
 	}
-	m := mtd_info_user{
-		erasesize: 4,
+	m := unix.MtdInfo{
+		Erasesize: 4,
 	}
 
 	cases := []struct {
