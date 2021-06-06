@@ -472,7 +472,7 @@ func tryPetWatchdog() bool {
 		log.Printf("ioctl WDIOC_SETTIMEOUT failed: %v", err2)
 	}
 
-	err3 := ioctl(f.Fd(), unix.WDIOC_KEEPALIVE, uintptr(0))
+	err3 := unix.IoctlWatchdogKeepalive(int(f.Fd()))
 	if err3 != nil {
 		log.Printf("ioctl WDIOC_KEEPALIVE failed: %v", err3)
 	}
