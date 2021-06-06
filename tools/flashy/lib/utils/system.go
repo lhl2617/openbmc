@@ -466,13 +466,20 @@ func tryPetWatchdog() bool {
 	// if a hardware watchdog is in use.  In any case, don't arrange to
 	// restore the original timeout value because the current design for
 	// flashy is that the system will reboot afterwards.
-	timo := int32(300)
+	timo := int32(300) // in seconds
+	log.Printf("Setting watchdog timeout to: %v", timo)
 	err2 := ioctl(f.Fd(), unix.WDIOC_SETTIMEOUT, uintptr(unsafe.Pointer(&timo)))
 	if err2 != nil {
 		log.Printf("ioctl WDIOC_SETTIMEOUT failed: %v", err2)
+	} else {
+		// the watchdog may have a different granularity in time causing a
+		// a different timeout set from the one requested. This should be a
+		// non-issue, but log it anyway.
+		// See: https://www.kernel.org/doc/Documentation/watchdog/watchdog-api.txt
+		log.Printf("Watchdog timeout set to: %v", timo)
 	}
 
-	err3 := ioctl(f.Fd(), unix.WDIOC_KEEPALIVE, uintptr(0))
+	err3 := unix.IoctlWatchdogKeepalive(int(f.Fd()))
 	if err3 != nil {
 		log.Printf("ioctl WDIOC_KEEPALIVE failed: %v", err3)
 	}
