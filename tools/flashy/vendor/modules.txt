@@ -15,9 +15,6 @@ github.com/pkg/errors
 github.com/u-root/u-root/pkg/dt
 github.com/u-root/u-root/pkg/ubinary
 github.com/u-root/u-root/pkg/uio
-# github.com/vtolstov/go-ioctl v0.0.0-20151206205506-6be9cced4810
-## explicit
-github.com/vtolstov/go-ioctl
 # golang.org/x/sys v0.0.0-20210603125802-9665404d3644
 ## explicit
 golang.org/x/sys/internal/unsafeheader
